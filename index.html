@@ -364,7 +364,7 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
 .admin-login{display:none}
 /* ─── FARMER VIEW ─── */
 #farmerView{display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px;overflow-y:auto;background:var(--mist);min-height:100vh}
-.fv-card{background:#fff;border-radius:18px;box-shadow:var(--shadow-lg);width:100%;max-width:560px;overflow:hidden;margin-bottom:16px}
+.fv-card{background:#fff;border-radius:18px;box-shadow:var(--shadow-lg);width:100%;max-width:760px;overflow:hidden;margin-bottom:16px}
 .fv-header{background:linear-gradient(135deg,var(--g600),var(--g400));padding:24px;color:#fff;display:flex;align-items:center;gap:14px}
 .fv-header-logo{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.5)}
 .fv-name{font-size:18px;font-weight:800}
@@ -380,6 +380,10 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
 .fv-fk{font-size:12px;color:var(--muted)}
 .fv-fv{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px}
 .fv-parcel{background:var(--mist);border-radius:12px;padding:14px;margin-bottom:10px;border-left:4px solid var(--g400)}
+.fv-map-wrap{position:relative;border-radius:12px;overflow:hidden;border:1.5px solid var(--mist3);margin-bottom:4px}
+#fvMap{height:min(65vh,520px);min-height:340px;width:100%}
+.fv-map-controls{position:absolute;bottom:8px;right:8px;display:flex;flex-direction:column;gap:6px;z-index:400}
+.fv-north-arrow{position:absolute;top:8px;right:8px;z-index:400;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));cursor:default;pointer-events:none}
 .fv-parcel-title{font-size:12px;font-weight:700;color:var(--g600);margin-bottom:8px}
 .fv-logout{width:100%;padding:12px;border-radius:12px;background:var(--mist3);color:var(--ink2);border:none;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;transition:var(--trans)}
 .fv-logout:hover{background:var(--rose-l);color:#b91c1c}
@@ -441,6 +445,22 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
       </div>
       <div class="fv-section-title">Registration Info</div>
       <div id="fvRegFields"></div>
+      <div class="fv-section-title">Parcel Location</div>
+      <div class="fv-map-wrap">
+        <div id="fvMap"></div>
+        <div class="fv-north-arrow" title="North">
+          <svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="19" fill="white" stroke="#d1d5db" stroke-width="1.5"/>
+            <polygon points="20,4 15,22 20,18 25,22" fill="#1a1a1a"/>
+            <polygon points="20,36 15,18 20,22 25,18" fill="#9ca3af"/>
+            <text x="20" y="9" text-anchor="middle" font-size="7" font-weight="800" font-family="Space Grotesk,sans-serif" fill="white">N</text>
+          </svg>
+        </div>
+        <div class="fv-map-controls">
+          <button class="map-ctrl-btn" title="Reset view" onclick="resetFvMapView()">🏠</button>
+          <button class="map-ctrl-btn" title="Switch to Street map" id="fvBasemapBtn" onclick="toggleFvBasemap()">🗺 Street</button>
+        </div>
+      </div>
       <div class="fv-section-title">My Farm Parcel(s)</div>
       <div id="fvParcelsDiv"></div>
       <button class="fv-logout" onclick="doLogout()">↩ Sign Out</button>
@@ -2098,6 +2118,63 @@ function doFarmerLogin(){
   document.querySelector('.shell').style.display='none';
 }
 
+let fvMapInstance=null, fvMapLayer=null, fvIsSatellite=true;
+let fvBaseSatellite, fvBaseLabels, fvBaseStreet;
+
+function toggleFvBasemap(){
+  fvIsSatellite=!fvIsSatellite;
+  if(fvIsSatellite){
+    fvBaseStreet.remove();
+    fvBaseSatellite.addTo(fvMapInstance);
+    fvBaseLabels.addTo(fvMapInstance);
+    document.getElementById('fvBasemapBtn').innerHTML='🗺 Street';
+    document.getElementById('fvBasemapBtn').title='Switch to Street map';
+  } else {
+    fvBaseSatellite.remove();
+    fvBaseLabels.remove();
+    fvBaseStreet.addTo(fvMapInstance);
+    document.getElementById('fvBasemapBtn').innerHTML='🛰 Satellite';
+    document.getElementById('fvBasemapBtn').title='Switch to Satellite';
+  }
+}
+
+function resetFvMapView(){
+  if(fvMapLayer)try{fvMapInstance.fitBounds(fvMapLayer.getBounds(),{padding:[20,20],maxZoom:18})}catch(e){}
+}
+
+function renderFvMap(parcels){
+  if(!fvMapInstance){
+    fvMapInstance=L.map('fvMap',{zoomControl:true,attributionControl:false}).setView([17.65,121.88],14);
+    fvBaseSatellite=L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{maxZoom:22});
+    fvBaseLabels=L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}',{maxZoom:22,opacity:.65});
+    fvBaseStreet=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
+    fvBaseSatellite.addTo(fvMapInstance);
+    fvBaseLabels.addTo(fvMapInstance);
+    L.control.scale({position:'bottomleft',metric:true,imperial:false,maxWidth:100}).addTo(fvMapInstance);
+    fvMapLayer=L.featureGroup().addTo(fvMapInstance);
+  }
+  fvMapLayer.clearLayers();
+  parcels.forEach((f,i)=>{
+    const p=f.properties;
+    const col=parcelColor(p.area_ha);
+    const layer=L.geoJSON(f,{style:{fillColor:col,fillOpacity:.75,color:'#ffffff',weight:2,opacity:1}});
+    const popupHtml=`<div style="padding:12px 16px;min-width:180px;color:#fff;font-family:var(--font)">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">${p.farmer_nam||'—'}</div>
+      <div style="font-size:12px;line-height:1.6">
+        Parcel ${i+1}${p.parcel_id?' · '+p.parcel_id:''}<br/>
+        Area: ${parseFloat(p.area_ha).toFixed(4)} ha<br/>
+        Location: ${p.barangay_1||p.barangay||'—'}
+      </div>
+    </div>`;
+    layer.bindPopup(popupHtml);
+    fvMapLayer.addLayer(layer);
+  });
+  setTimeout(()=>{
+    fvMapInstance.invalidateSize();
+    try{fvMapInstance.fitBounds(fvMapLayer.getBounds(),{padding:[20,20],maxZoom:18});}catch(e){}
+  },200);
+}
+
 function renderFarmerView(parcels){
   const p=parcels[0].properties;
   const totalArea=parcels.reduce((s,f)=>s+parseFloat(f.properties.area_ha||0),0);
@@ -2123,6 +2200,7 @@ function renderFarmerView(parcels){
       ${pp.parcel_id?`<div class="fv-field"><span class="fv-fk">Parcel ID</span><span class="fv-fv" style="font-family:var(--mono)">${pp.parcel_id}</span></div>`:''}
     </div>`;
   }).join('');
+  renderFvMap(parcels);
 }
 
 function doLogout(){
