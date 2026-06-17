@@ -437,7 +437,7 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
       <div style="font-size:10px;color:rgba(255,255,255,.65)">Farm Parcel Registry · Bayan ng Solana, Cagayan</div>
     </div>
     <div id="fvRsbsaBadge" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.85)"></div>
-    <button onclick="doLogout()" style="padding:7px 14px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">↩ Exit</button>
+    <button onclick="doLogout()" style="padding:7px 14px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">↩ Logout</button>
   </div>
   <div style="flex:1;display:grid;grid-template-columns:1fr 320px;overflow:hidden">
     <div style="position:relative">
@@ -919,7 +919,7 @@ const GH_DEFAULT = {
   owner:  'abedivisioncag-dev',      // ← your GitHub username
   repo:   'RiceParcelRegistry',      // ← your repository name
   branch: 'main',                   // ← branch
-  token:  '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'   // ← paste your PAT here between the quotes
+  token:  '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',   // ← paste your PAT here between the quotes
 };
 
 function ghConfig(){
@@ -1787,42 +1787,23 @@ function doImport(){
     return {type:'Feature',geometry:feat.geometry,properties:mapped};
   }).filter(f=>f.properties.area_ha>0);
   setProgress(70,'Checking for duplicates…');
-  // Duplicate detection: check by parcel_id (not name) — same farmer can own multiple parcels
-  const prevImported=farmData.features.filter(f=>f.properties._source==='imported');
+  // Duplicate detection: warn if farmer_nam already exists in builtins
   const builtins=farmData.features.filter(f=>f.properties._source!=='imported');
-
-  // Check for duplicate parcel_ids (true duplicates = same physical parcel)
-  const existingParcelIds=new Set(
-    [...builtins,...prevImported]
-      .map(f=>(f.properties.parcel_id||'').trim())
-      .filter(id=>id!=='')
-  );
-  const parcelDupes=newFeatures.filter(f=>{
-    const id=(f.properties.parcel_id||'').trim();
-    return id!==''&&existingParcelIds.has(id);
-  });
-  if(parcelDupes.length){
-    const ids=parcelDupes.slice(0,5).map(f=>f.properties.parcel_id).join(', ')+(parcelDupes.length>5?` +${parcelDupes.length-5} more`:'');
-    if(!confirm(`⚠️ ${parcelDupes.length} parcel${parcelDupes.length>1?'s':''} with the same Parcel ID already exist:\n${ids}\n\nImporting will UPDATE these parcels. Continue?`)){showError('Import cancelled.');return;}
+  const existingNames=new Set(builtins.map(f=>(f.properties.farmer_nam||'').trim().toUpperCase()));
+  const dupes=newFeatures.filter(f=>existingNames.has((f.properties.farmer_nam||'').trim().toUpperCase()));
+  if(dupes.length){
+    const names=dupes.slice(0,5).map(f=>f.properties.farmer_nam).join(', ')+(dupes.length>5?` +${dupes.length-5} more`:'');
+    if(!confirm(`⚠️ ${dupes.length} possible duplicate farmer${dupes.length>1?'s':''} found:\n${names}\n\nImport anyway?`)){showError('Import cancelled.');return;}
   }
-
-  // Merge: keep builtins + prev imported (excluding any parcel_id that's being updated) + new
-  const newParcelIds=new Set(newFeatures.map(f=>(f.properties.parcel_id||'').trim()).filter(id=>id!==''));
-  // Keep previous imported parcels UNLESS their parcel_id is being replaced by new import
-  // Same farmer name with DIFFERENT parcel_id = different parcel = KEEP BOTH
-  const prevKept=prevImported.filter(f=>{
-    const id=(f.properties.parcel_id||'').trim();
-    return id===''||!newParcelIds.has(id); // keep if no parcel_id or parcel_id not in new batch
-  });
-  farmData.features=[...builtins,...prevKept,...newFeatures];
-  const totalImported=farmData.features.filter(f=>f.properties._source==='imported').length;
+  // Merge: remove old imported, add new
+  farmData.features=[...builtins,...newFeatures];
   setProgress(80,'Saving to GitHub…');
   saveToGitHub().then(ok=>{
     setProgress(100, ok?'✅ Saved to GitHub!':'⚠️ Saved locally only');
     setTimeout(()=>{
       showSuccess(ok
-        ?`✅ Added ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — ${totalImported} total imported, visible to ALL users!`
-        :`✅ Added ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — ${totalImported} total (local only)`);
+        ?`✅ Imported ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — now visible to ALL users!`
+        :`✅ Imported ${newFeatures.length} parcel${newFeatures.length>1?'s':''} (local only — configure GitHub to share)`);
       updateDataSourceBadge(true);
       fullRefresh();
       setTimeout(()=>{closeImportModal();switchView('map');},2000);
