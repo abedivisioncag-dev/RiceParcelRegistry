@@ -832,6 +832,9 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
           <div style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:4px">🔗 GitHub Shared Storage</div>
           <div style="font-size:12px;color:#374151;line-height:1.6">When configured, imported data is saved to your GitHub repo and automatically loaded by <b>everyone</b> who opens this dashboard.</div>
         </div>
+        <div id="ghDefaultNote" style="display:none;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:600;margin-bottom:12px;background:#dcfce7;color:#15803d;border:1px solid #86efac">
+          ✅ Using pre-configured defaults embedded in the file. No setup needed — all admins share the same connection automatically.
+        </div>
         <div id="ghStatus" style="padding:10px 14px;border-radius:10px;font-size:12px;font-weight:600;margin-bottom:16px;background:var(--mist3);color:var(--muted)">Checking…</div>
         <div style="display:flex;flex-direction:column;gap:12px">
           <div>
@@ -910,12 +913,21 @@ let farmData = JSON.parse(JSON.stringify(BUILTIN_DATA));
 // ═══════════════════════════════════════
 const GH_DATA_FILE = 'imported_data.geojson';
 
+// ─── DEFAULT GITHUB CONFIG (embedded — no setup needed) ───
+const GH_DEFAULT = {
+  owner:  'abedivisioncag-dev',      // ← your GitHub username
+  repo:   'RiceParcelRegistry',      // ← your repository name
+  branch: 'main',                   // ← branch
+  token:  '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' // ← paste your PAT here between the quotes
+};
+
 function ghConfig(){
+  // Use localStorage overrides if set, otherwise fall back to embedded defaults
   return {
-    owner:  localStorage.getItem('gh_owner')||'',
-    repo:   localStorage.getItem('gh_repo')||'',
-    branch: localStorage.getItem('gh_branch')||'main',
-    token:  localStorage.getItem('gh_token')||''
+    owner:  localStorage.getItem('gh_owner')  || GH_DEFAULT.owner,
+    repo:   localStorage.getItem('gh_repo')   || GH_DEFAULT.repo,
+    branch: localStorage.getItem('gh_branch') || GH_DEFAULT.branch,
+    token:  localStorage.getItem('gh_token')  || GH_DEFAULT.token
   };
 }
 
@@ -1559,7 +1571,11 @@ function loadGhConfigUI(){
   document.getElementById('ghOwner').value=c.owner||'';
   document.getElementById('ghRepo').value=c.repo||'';
   document.getElementById('ghBranch').value=c.branch||'main';
-  document.getElementById('ghToken').value=c.token||'';
+  document.getElementById('ghToken').value=localStorage.getItem('gh_token')||'';
+  // Show note if using embedded defaults
+  const usingDefaults=!localStorage.getItem('gh_owner')&&GH_DEFAULT.owner;
+  const noteEl=document.getElementById('ghDefaultNote');
+  if(noteEl)noteEl.style.display=usingDefaults?'block':'none';
   updateGhStatus();
 }
 
