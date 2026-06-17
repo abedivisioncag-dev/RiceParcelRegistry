@@ -437,7 +437,7 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
       <div style="font-size:10px;color:rgba(255,255,255,.65)">Farm Parcel Registry · Bayan ng Solana, Cagayan</div>
     </div>
     <div id="fvRsbsaBadge" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.85)"></div>
-    <button onclick="doLogout()" style="padding:7px 14px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">↩ Logout</button>
+    <button onclick="doLogout()" style="padding:7px 14px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">↩ Exit</button>
   </div>
   <div style="flex:1;display:grid;grid-template-columns:1fr 320px;overflow:hidden">
     <div style="position:relative">
@@ -797,7 +797,8 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
           <div class="dm-info" id="dmInfo">—</div>
           <div class="dm-actions">
             <button class="dm-btn" onclick="exportGeoJSON()">⬇ Export GeoJSON</button>
-            <button class="dm-btn danger" onclick="resetToBuiltin()">↺ Reset to Sample Data</button>
+            <button class="dm-btn" onclick="resetToBuiltin()">👁 View Sample Data</button>
+            <button class="dm-btn danger" onclick="permanentDeleteFromGitHub()">🗑 Delete from GitHub</button>
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
@@ -918,7 +919,7 @@ const GH_DEFAULT = {
   owner:  'abedivisioncag-dev',      // ← your GitHub username
   repo:   'RiceParcelRegistry',      // ← your repository name
   branch: 'main',                   // ← branch
-  token:  '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' // ← paste your PAT here between the quotes
+  token:  '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'   // ← paste your PAT here between the quotes
 };
 
 function ghConfig(){
@@ -1786,23 +1787,42 @@ function doImport(){
     return {type:'Feature',geometry:feat.geometry,properties:mapped};
   }).filter(f=>f.properties.area_ha>0);
   setProgress(70,'Checking for duplicates…');
-  // Duplicate detection: warn if farmer_nam already exists in builtins
+  // Duplicate detection: check by parcel_id (not name) — same farmer can own multiple parcels
+  const prevImported=farmData.features.filter(f=>f.properties._source==='imported');
   const builtins=farmData.features.filter(f=>f.properties._source!=='imported');
-  const existingNames=new Set(builtins.map(f=>(f.properties.farmer_nam||'').trim().toUpperCase()));
-  const dupes=newFeatures.filter(f=>existingNames.has((f.properties.farmer_nam||'').trim().toUpperCase()));
-  if(dupes.length){
-    const names=dupes.slice(0,5).map(f=>f.properties.farmer_nam).join(', ')+(dupes.length>5?` +${dupes.length-5} more`:'');
-    if(!confirm(`⚠️ ${dupes.length} possible duplicate farmer${dupes.length>1?'s':''} found:\n${names}\n\nImport anyway?`)){showError('Import cancelled.');return;}
+
+  // Check for duplicate parcel_ids (true duplicates = same physical parcel)
+  const existingParcelIds=new Set(
+    [...builtins,...prevImported]
+      .map(f=>(f.properties.parcel_id||'').trim())
+      .filter(id=>id!=='')
+  );
+  const parcelDupes=newFeatures.filter(f=>{
+    const id=(f.properties.parcel_id||'').trim();
+    return id!==''&&existingParcelIds.has(id);
+  });
+  if(parcelDupes.length){
+    const ids=parcelDupes.slice(0,5).map(f=>f.properties.parcel_id).join(', ')+(parcelDupes.length>5?` +${parcelDupes.length-5} more`:'');
+    if(!confirm(`⚠️ ${parcelDupes.length} parcel${parcelDupes.length>1?'s':''} with the same Parcel ID already exist:\n${ids}\n\nImporting will UPDATE these parcels. Continue?`)){showError('Import cancelled.');return;}
   }
-  // Merge: remove old imported, add new
-  farmData.features=[...builtins,...newFeatures];
+
+  // Merge: keep builtins + prev imported (excluding any parcel_id that's being updated) + new
+  const newParcelIds=new Set(newFeatures.map(f=>(f.properties.parcel_id||'').trim()).filter(id=>id!==''));
+  // Keep previous imported parcels UNLESS their parcel_id is being replaced by new import
+  // Same farmer name with DIFFERENT parcel_id = different parcel = KEEP BOTH
+  const prevKept=prevImported.filter(f=>{
+    const id=(f.properties.parcel_id||'').trim();
+    return id===''||!newParcelIds.has(id); // keep if no parcel_id or parcel_id not in new batch
+  });
+  farmData.features=[...builtins,...prevKept,...newFeatures];
+  const totalImported=farmData.features.filter(f=>f.properties._source==='imported').length;
   setProgress(80,'Saving to GitHub…');
   saveToGitHub().then(ok=>{
     setProgress(100, ok?'✅ Saved to GitHub!':'⚠️ Saved locally only');
     setTimeout(()=>{
       showSuccess(ok
-        ?`✅ Imported ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — now visible to ALL users!`
-        :`✅ Imported ${newFeatures.length} parcel${newFeatures.length>1?'s':''} (local only — configure GitHub to share)`);
+        ?`✅ Added ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — ${totalImported} total imported, visible to ALL users!`
+        :`✅ Added ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — ${totalImported} total (local only)`);
       updateDataSourceBadge(true);
       fullRefresh();
       setTimeout(()=>{closeImportModal();switchView('map');},2000);
@@ -1850,23 +1870,58 @@ function deleteParcel(idx){
 }
 
 function resetToBuiltin(){
-  if(!confirm('This will remove all imported parcels and restore the sample data. Continue?'))return;
+  // Give admin two clear choices
+  const choice=confirm(
+    'RESET OPTIONS:\n\n' +
+    '✅ OK  →  View sample data THIS SESSION ONLY\n' +
+    '         (imported data stays on GitHub, comes back on refresh)\n\n' +
+    '❌ Cancel  →  Do nothing\n\n' +
+    'To permanently delete all imported data from GitHub,\n' +
+    'use the "🗑 Delete from GitHub" button instead.'
+  );
+  if(!choice)return;
+  // Session-only reset — just reload built-in data locally, do NOT touch GitHub
   farmData=JSON.parse(JSON.stringify(BUILTIN_DATA));
-  if(ghIsConfigured()){
-    const c=ghConfig();
-    const apiUrl=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${GH_DATA_FILE}`;
-    fetch(apiUrl,{headers:{'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'}})
-      .then(r=>r.ok?r.json():null)
-      .then(d=>{
-        if(!d)return;
-        const body={message:'Reset imported data',content:btoa(JSON.stringify({type:'FeatureCollection',features:[]})),sha:d.sha,branch:c.branch||'main'};
-        return fetch(apiUrl,{method:'PUT',headers:{'Authorization':`token ${c.token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
-      }).then(()=>toast('Reset & synced to GitHub','ok')).catch(()=>toast('Reset locally','ok'));
-  } else {
-    saveToStorage();
-    toast('Restored to sample data','ok');
-  }
-  updateDataSourceBadge(false);fullRefresh();refreshManageTab();closeImportModal();
+  saveToStorage(); // clear localStorage backup too
+  updateDataSourceBadge(false);
+  fullRefresh();
+  refreshManageTab();
+  closeImportModal();
+  toast('Showing sample data — imported data still safe on GitHub 🔒','ok');
+}
+
+function permanentDeleteFromGitHub(){
+  if(!confirm(
+    '⚠️ PERMANENT DELETE\n\n' +
+    'This will permanently remove ALL imported farm parcels from GitHub.\n' +
+    'ALL users will lose the imported data after refresh.\n\n' +
+    'This CANNOT be undone. Are you sure?'
+  ))return;
+  if(!confirm('Second confirmation: DELETE all imported data from GitHub?'))return;
+  farmData=JSON.parse(JSON.stringify(BUILTIN_DATA));
+  const c=ghConfig();
+  const apiUrl=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${GH_DATA_FILE}`;
+  fetch(apiUrl,{headers:{'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'}})
+    .then(r=>r.ok?r.json():null)
+    .then(d=>{
+      if(!d){toast('No imported data found on GitHub','ok');return;}
+      const empty={type:'FeatureCollection',features:[]};
+      const body={message:'Permanent reset — all imported data removed',content:btoa(unescape(encodeURIComponent(JSON.stringify(empty)))),sha:d.sha,branch:c.branch||'main'};
+      return fetch(apiUrl,{method:'PUT',headers:{'Authorization':`token ${c.token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},body:JSON.stringify(body)});
+    })
+    .then(r=>{
+      if(r&&r.ok){
+        saveToStorage();
+        updateDataSourceBadge(false);
+        fullRefresh();
+        refreshManageTab();
+        toast('✅ All imported data permanently deleted from GitHub','ok');
+      } else {
+        toast('❌ GitHub delete failed — check your token','err');
+      }
+    })
+    .catch(()=>toast('❌ Network error — could not reach GitHub','err'));
+  closeImportModal();
 }
 
 function exportGeoJSON(){
