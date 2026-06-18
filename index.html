@@ -476,6 +476,19 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
           </div>
         </div>
       </div>
+      <div style="padding:12px 16px;border-bottom:1px solid var(--mist);background:var(--mist)">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:8px">Map Legend</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink2)">
+            <div style="width:18px;height:12px;border-radius:3px;background:#f59e0b;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.2);flex-shrink:0"></div>
+            <span>Your parcel(s)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink2)">
+            <div style="width:18px;height:12px;border-radius:3px;background:#9ca3af;opacity:.6;border:1px solid #fff;flex-shrink:0"></div>
+            <span>Other parcels</span>
+          </div>
+        </div>
+      </div>
       <div style="padding:16px;border-bottom:1px solid var(--mist)">
         <div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:8px">Registration Info</div>
         <div id="fvRegFields"></div>
@@ -798,12 +811,13 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
           <div class="dm-actions">
             <button class="dm-btn" onclick="exportGeoJSON()">⬇ Export GeoJSON</button>
             <button class="dm-btn" onclick="resetToBuiltin()">👁 View Sample Data</button>
-            <button class="dm-btn danger" onclick="permanentDeleteFromGitHub()">🗑 Delete from GitHub</button>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+
+        <!-- Filter / Sort bar -->
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
           <input id="dmSearch" type="text" placeholder="🔍 Filter by name or barangay…" oninput="refreshManageTab()"
-            style="flex:1;min-width:160px;padding:7px 10px;border:1.5px solid var(--mist3);border-radius:8px;font-family:var(--font);font-size:12px;outline:none;background:var(--mist)"
+            style="flex:1;min-width:140px;padding:7px 10px;border:1.5px solid var(--mist3);border-radius:8px;font-family:var(--font);font-size:12px;outline:none;background:var(--mist)"
             onfocus="this.style.borderColor='var(--g400)'" onblur="this.style.borderColor='var(--mist3)'"/>
           <select id="dmSort" onchange="refreshManageTab()" style="padding:7px 10px;border:1.5px solid var(--mist3);border-radius:8px;font-family:var(--font);font-size:12px;outline:none;background:var(--mist);cursor:pointer">
             <option value="default">Sort: Default</option>
@@ -819,8 +833,26 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
             <option value="imported">Imported</option>
           </select>
         </div>
+
+        <!-- Bulk delete toolbar -->
+        <div id="bulkBar" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--mist);border-radius:9px;margin-bottom:8px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer">
+            <input type="checkbox" id="dmSelectAll" onchange="toggleSelectAll(this.checked)" style="width:15px;height:15px;cursor:pointer"/>
+            Select All
+          </label>
+          <span id="dmSelectedCount" style="font-size:12px;color:var(--muted);flex:1">0 selected</span>
+          <button id="dmDeleteSelected" onclick="deleteSelectedFromGitHub()"
+            style="padding:7px 14px;border-radius:8px;background:#ef4444;color:#fff;border:none;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;opacity:.4;pointer-events:none;transition:var(--trans)">
+            🗑 Delete Selected from GitHub
+          </button>
+          <button onclick="permanentDeleteFromGitHub()"
+            style="padding:7px 14px;border-radius:8px;background:#7f1d1d;color:#fff;border:none;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:var(--trans)">
+            ⚠️ Delete ALL from GitHub
+          </button>
+        </div>
+
         <table class="dm-tbl">
-          <thead><tr><th>#</th><th>Farmer</th><th>Farm Location</th><th>Area (ha)</th><th>Source</th><th></th></tr></thead>
+          <thead><tr><th></th><th>#</th><th>Farmer</th><th>Farm Location</th><th>Area (ha)</th><th>Source</th><th></th></tr></thead>
           <tbody id="dmTbody"></tbody>
         </table>
         <div class="dm-empty" id="dmEmpty" style="display:none">No parcels loaded.</div>
@@ -857,8 +889,10 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
           </div>
           <div style="display:flex;gap:8px">
             <button onclick="saveGhConfig()" style="flex:1;padding:10px;border-radius:10px;background:var(--g500);color:#fff;border:none;font-family:var(--font);font-weight:700;font-size:13px;cursor:pointer">💾 Save & Test Connection</button>
+            <button onclick="diagnoseGitHub()" style="padding:10px 14px;border-radius:10px;background:#1d4ed8;color:#fff;border:none;font-family:var(--font);font-weight:600;font-size:12px;cursor:pointer">🔍 Diagnose</button>
             <button onclick="clearGhConfig()" style="padding:10px 14px;border-radius:10px;background:var(--mist3);color:var(--ink2);border:none;font-family:var(--font);font-weight:600;font-size:12px;cursor:pointer">Clear</button>
           </div>
+          <div id="ghDiagLog" style="display:none;background:#1f2937;border-radius:10px;padding:12px 14px;font-family:monospace;font-size:11px;color:#e5e7eb;line-height:1.8;margin-top:4px;white-space:pre-wrap"></div>
           <div style="padding:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:9px;font-size:11px;color:#92400e;line-height:1.6">
             <b>⚠️ Security:</b> Only enter your PAT on trusted devices. It gives write access to your repo — keep it private.
           </div>
@@ -916,10 +950,10 @@ const GH_DATA_FILE = 'imported_data.geojson';
 
 // ─── DEFAULT GITHUB CONFIG (embedded — no setup needed) ───
 const GH_DEFAULT = {
-  owner:  'abedivisioncag-dev',      // ← your GitHub username
-  repo:   'RiceParcelRegistry',      // ← your repository name
-  branch: 'main',                   // ← branch
-  token:  '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',   // ← paste your PAT here between the quotes
+  owner:  'abedivisioncag-dev',
+  repo:   'RiceParcelRegistry',
+  branch: 'main',
+  token:  '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'
 };
 
 function ghConfig(){
@@ -1623,6 +1657,88 @@ function clearGhConfig(){
   toast('GitHub config cleared','ok');
 }
 
+async function diagnoseGitHub(){
+  const log=document.getElementById('ghDiagLog');
+  log.style.display='block';
+  log.textContent='🔍 Running diagnostics...\n\n';
+  const c=ghConfig();
+  const addLog=(icon,msg)=>{ log.textContent+=`${icon} ${msg}\n`; };
+
+  // Step 1: Check config
+  addLog('📋','Config check:');
+  addLog(c.owner?'✅':'❌', `Owner: ${c.owner||'(empty)'}`);
+  addLog(c.repo ?'✅':'❌', `Repo:  ${c.repo||'(empty)'}`);
+  addLog(c.branch?'✅':'❌',`Branch: ${c.branch||'(empty)'}`);
+  addLog(c.token?'✅':'❌', `Token: ${c.token?c.token.slice(0,8)+'…(hidden)':'(empty — paste your PAT!)'}`);
+  if(!c.token){ addLog('💡','FIX: Paste your GitHub PAT in the token field above and click Save.'); return; }
+  addLog('','');
+
+  // Step 2: Check repo exists & token works
+  addLog('🌐','Testing repo access...');
+  try{
+    const r=await fetch(`https://api.github.com/repos/${c.owner}/${c.repo}`,{
+      headers:{'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    const d=await r.json();
+    if(r.ok){
+      addLog('✅',`Repo found: ${d.full_name}`);
+      addLog(d.private?'🔒':'🌍',`Visibility: ${d.private?'Private':'Public'}`);
+    } else if(r.status===401){
+      addLog('❌','Token rejected (401 Unauthorized)');
+      addLog('💡','FIX: Your token is invalid or expired. Generate a new PAT:');
+      addLog('   ','→ github.com → Settings → Developer settings → Personal access tokens → Tokens (classic)');
+      addLog('   ','→ Generate new token → tick "repo" scope → No expiration → Copy & paste here');
+      return;
+    } else if(r.status===404){
+      addLog('❌',`Repo not found (404) — check owner/repo spelling`);
+      addLog('💡',`FIX: Confirm the repo exists at github.com/${c.owner}/${c.repo}`);
+      return;
+    } else {
+      addLog('❌',`Unexpected error: ${r.status} — ${d.message||'unknown'}`);
+      return;
+    }
+  } catch(e){ addLog('❌','Network error — check your internet connection'); return; }
+  addLog('','');
+
+  // Step 3: Check write permission
+  addLog('✏️','Testing write permission...');
+  try{
+    const apiUrl=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${GH_DATA_FILE}`;
+    const getR=await fetch(apiUrl,{headers:{'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'}});
+    if(getR.ok){
+      const fd=await getR.json();
+      addLog('✅',`File exists: ${GH_DATA_FILE} (SHA: ${fd.sha.slice(0,8)}…)`);
+      // Try a write test
+      const testContent=btoa(unescape(encodeURIComponent(JSON.stringify({type:'FeatureCollection',features:[]}))));
+      const putR=await fetch(apiUrl,{method:'PUT',
+        headers:{'Authorization':`token ${c.token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+        body:JSON.stringify({message:'Diagnostic write test',content:testContent,sha:fd.sha,branch:c.branch||'main'})
+      });
+      if(putR.ok){
+        addLog('✅','Write permission confirmed!');
+        addLog('✅','GitHub sync is fully working.');
+        // Restore actual data
+        const ok=await saveToGitHub();
+        addLog(ok?'✅':'⚠️', ok?'Data restored after test.':'Warning: could not restore data after test.');
+      } else {
+        const pe=await putR.json();
+        addLog('❌',`Write failed: ${putR.status} — ${pe.message||'unknown'}`);
+        if(putR.status===403){
+          addLog('💡','FIX: Your token does not have write access.');
+          addLog('   ','→ Generate new token with "repo" scope (full control), not just "read"');
+        }
+      }
+    } else if(getR.status===404){
+      addLog('⚠️',`File "${GH_DATA_FILE}" does not exist yet — it will be created on first import.`);
+      addLog('✅','This is normal before your first import.');
+    } else {
+      addLog('❌',`Could not read file: ${getR.status}`);
+    }
+  } catch(e){ addLog('❌',`Write test error: ${e.message}`); }
+  addLog('','');
+  addLog('🏁','Diagnostics complete.');
+}
+
 // ─── DRAG & DROP on modal ───
 function dzDragOver(e){e.preventDefault();document.getElementById('dropZone').classList.add('drag-over');}
 function dzDragLeave(){document.getElementById('dropZone').classList.remove('drag-over');}
@@ -1787,23 +1903,42 @@ function doImport(){
     return {type:'Feature',geometry:feat.geometry,properties:mapped};
   }).filter(f=>f.properties.area_ha>0);
   setProgress(70,'Checking for duplicates…');
-  // Duplicate detection: warn if farmer_nam already exists in builtins
+  // Duplicate detection: check by parcel_id (not name) — same farmer can own multiple parcels
+  const prevImported=farmData.features.filter(f=>f.properties._source==='imported');
   const builtins=farmData.features.filter(f=>f.properties._source!=='imported');
-  const existingNames=new Set(builtins.map(f=>(f.properties.farmer_nam||'').trim().toUpperCase()));
-  const dupes=newFeatures.filter(f=>existingNames.has((f.properties.farmer_nam||'').trim().toUpperCase()));
-  if(dupes.length){
-    const names=dupes.slice(0,5).map(f=>f.properties.farmer_nam).join(', ')+(dupes.length>5?` +${dupes.length-5} more`:'');
-    if(!confirm(`⚠️ ${dupes.length} possible duplicate farmer${dupes.length>1?'s':''} found:\n${names}\n\nImport anyway?`)){showError('Import cancelled.');return;}
+
+  // Check for duplicate parcel_ids (true duplicates = same physical parcel)
+  const existingParcelIds=new Set(
+    [...builtins,...prevImported]
+      .map(f=>(f.properties.parcel_id||'').trim())
+      .filter(id=>id!=='')
+  );
+  const parcelDupes=newFeatures.filter(f=>{
+    const id=(f.properties.parcel_id||'').trim();
+    return id!==''&&existingParcelIds.has(id);
+  });
+  if(parcelDupes.length){
+    const ids=parcelDupes.slice(0,5).map(f=>f.properties.parcel_id).join(', ')+(parcelDupes.length>5?` +${parcelDupes.length-5} more`:'');
+    if(!confirm(`⚠️ ${parcelDupes.length} parcel${parcelDupes.length>1?'s':''} with the same Parcel ID already exist:\n${ids}\n\nImporting will UPDATE these parcels. Continue?`)){showError('Import cancelled.');return;}
   }
-  // Merge: remove old imported, add new
-  farmData.features=[...builtins,...newFeatures];
+
+  // Merge: keep builtins + prev imported (excluding any parcel_id that's being updated) + new
+  const newParcelIds=new Set(newFeatures.map(f=>(f.properties.parcel_id||'').trim()).filter(id=>id!==''));
+  // Keep previous imported parcels UNLESS their parcel_id is being replaced by new import
+  // Same farmer name with DIFFERENT parcel_id = different parcel = KEEP BOTH
+  const prevKept=prevImported.filter(f=>{
+    const id=(f.properties.parcel_id||'').trim();
+    return id===''||!newParcelIds.has(id); // keep if no parcel_id or parcel_id not in new batch
+  });
+  farmData.features=[...builtins,...prevKept,...newFeatures];
+  const totalImported=farmData.features.filter(f=>f.properties._source==='imported').length;
   setProgress(80,'Saving to GitHub…');
   saveToGitHub().then(ok=>{
     setProgress(100, ok?'✅ Saved to GitHub!':'⚠️ Saved locally only');
     setTimeout(()=>{
       showSuccess(ok
-        ?`✅ Imported ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — now visible to ALL users!`
-        :`✅ Imported ${newFeatures.length} parcel${newFeatures.length>1?'s':''} (local only — configure GitHub to share)`);
+        ?`✅ Added ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — ${totalImported} total imported, visible to ALL users!`
+        :`✅ Added ${newFeatures.length} parcel${newFeatures.length>1?'s':''} — ${totalImported} total (local only)`);
       updateDataSourceBadge(true);
       fullRefresh();
       setTimeout(()=>{closeImportModal();switchView('map');},2000);
@@ -1828,19 +1963,72 @@ function refreshManageTab(){
   const imported=farmData.features.filter(f=>f.properties._source==='imported').length;
   const uniqueFarmers=new Set(farmData.features.map(f=>(f.properties.farmer_nam||'').trim().toUpperCase())).size;
   document.getElementById('dmInfo').textContent=`${farmData.features.length} parcel${farmData.features.length>1?'s':''} · ${uniqueFarmers} unique farmer${uniqueFarmers>1?'s':''} · ${imported} imported · showing ${features.length}`;
+  // Store visible features globally for checkbox logic
+  window._dmVisibleFeatures=features;
   document.getElementById('dmTbody').innerHTML=features.map((f,i)=>{
     const p=f.properties;
     const realIdx=farmData.features.indexOf(f);
-    return `<tr>
+    const isImported=p._source==='imported';
+    return `<tr id="dmRow_${realIdx}">
+      <td style="text-align:center">
+        ${isImported?`<input type="checkbox" class="dm-chk" data-idx="${realIdx}" onchange="updateBulkBar()" style="width:14px;height:14px;cursor:pointer"/>`:'<span style="color:var(--muted2);font-size:10px">—</span>'}
+      </td>
       <td class="tbl-rank">${i+1}</td>
       <td style="font-weight:600">${p.farmer_nam||'—'}</td>
       <td>${p.barangay_1||p.barangay||'—'}</td>
       <td style="font-family:var(--mono)">${parseFloat(p.area_ha||0).toFixed(2)}</td>
-      <td><span class="dm-source-badge ${p._source==='imported'?'imported':'builtin'}">${p._source==='imported'?'Imported':'Built-in'}</span></td>
-      <td><button class="dm-del" onclick="deleteParcel(${realIdx})" title="Delete">🗑</button></td>
+      <td><span class="dm-source-badge ${isImported?'imported':'builtin'}">${isImported?'Imported':'Built-in'}</span></td>
+      <td><button class="dm-del" onclick="deleteParcel(${realIdx})" title="Delete row">🗑</button></td>
     </tr>`;
   }).join('');
   document.getElementById('dmEmpty').style.display=features.length?'none':'block';
+  document.getElementById('dmSelectAll').checked=false;
+  updateBulkBar();
+}
+
+function updateBulkBar(){
+  const checked=document.querySelectorAll('.dm-chk:checked');
+  const total=document.querySelectorAll('.dm-chk');
+  const count=checked.length;
+  document.getElementById('dmSelectedCount').textContent=`${count} of ${total.length} imported parcel${total.length!==1?'s':''} selected`;
+  const btn=document.getElementById('dmDeleteSelected');
+  if(count>0){
+    btn.style.opacity='1';btn.style.pointerEvents='auto';
+    btn.textContent=`🗑 Delete ${count} Selected from GitHub`;
+  } else {
+    btn.style.opacity='.4';btn.style.pointerEvents='none';
+    btn.textContent='🗑 Delete Selected from GitHub';
+  }
+  // Sync select-all checkbox state
+  const allChk=document.getElementById('dmSelectAll');
+  if(total.length>0)allChk.indeterminate=count>0&&count<total.length;
+  if(count===total.length&&total.length>0)allChk.checked=true;
+  else if(count===0)allChk.checked=false;
+}
+
+function toggleSelectAll(checked){
+  document.querySelectorAll('.dm-chk').forEach(c=>c.checked=checked);
+  updateBulkBar();
+}
+
+async function deleteSelectedFromGitHub(){
+  const checked=[...document.querySelectorAll('.dm-chk:checked')];
+  if(!checked.length){toast('No parcels selected','err');return;}
+  const idxs=checked.map(c=>parseInt(c.dataset.idx));
+  const names=idxs.slice(0,5).map(i=>farmData.features[i]?.properties.farmer_nam||'?').join(', ')+(idxs.length>5?` +${idxs.length-5} more`:'');
+  if(!confirm(`Delete ${idxs.length} selected parcel${idxs.length>1?'s':''} from GitHub?\n\n${names}\n\nThis cannot be undone.`))return;
+  const c=ghConfig();
+  if(!c.token){toast('❌ No token configured — open ⚙️ GitHub Sync tab','err');return;}
+  // Remove selected from local data (sort descending to not mess up indices)
+  idxs.sort((a,b)=>b-a).forEach(i=>farmData.features.splice(i,1));
+  toast(`Deleting ${checked.length} parcel${checked.length>1?'s':''} from GitHub…`,'ok');
+  const ok=await saveToGitHub();
+  if(ok){
+    toast(`✅ ${checked.length} parcel${checked.length>1?'s':''} deleted & synced to GitHub`,'ok');
+  } else {
+    toast('❌ GitHub sync failed — deleted locally only','err');
+  }
+  updateDataSourceBadge();fullRefresh();refreshManageTab();
 }
 
 function deleteParcel(idx){
@@ -1871,7 +2059,7 @@ function resetToBuiltin(){
   toast('Showing sample data — imported data still safe on GitHub 🔒','ok');
 }
 
-function permanentDeleteFromGitHub(){
+async function permanentDeleteFromGitHub(){
   if(!confirm(
     '⚠️ PERMANENT DELETE\n\n' +
     'This will permanently remove ALL imported farm parcels from GitHub.\n' +
@@ -1879,30 +2067,57 @@ function permanentDeleteFromGitHub(){
     'This CANNOT be undone. Are you sure?'
   ))return;
   if(!confirm('Second confirmation: DELETE all imported data from GitHub?'))return;
-  farmData=JSON.parse(JSON.stringify(BUILTIN_DATA));
+
   const c=ghConfig();
+  if(!c.token){
+    toast('❌ No token configured — open ⚙️ GitHub Sync tab and enter your PAT','err');
+    return;
+  }
+
+  toast('Deleting from GitHub…','ok');
   const apiUrl=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${GH_DATA_FILE}`;
-  fetch(apiUrl,{headers:{'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'}})
-    .then(r=>r.ok?r.json():null)
-    .then(d=>{
-      if(!d){toast('No imported data found on GitHub','ok');return;}
-      const empty={type:'FeatureCollection',features:[]};
-      const body={message:'Permanent reset — all imported data removed',content:btoa(unescape(encodeURIComponent(JSON.stringify(empty)))),sha:d.sha,branch:c.branch||'main'};
-      return fetch(apiUrl,{method:'PUT',headers:{'Authorization':`token ${c.token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},body:JSON.stringify(body)});
-    })
-    .then(r=>{
-      if(r&&r.ok){
-        saveToStorage();
-        updateDataSourceBadge(false);
-        fullRefresh();
-        refreshManageTab();
-        toast('✅ All imported data permanently deleted from GitHub','ok');
-      } else {
-        toast('❌ GitHub delete failed — check your token','err');
-      }
-    })
-    .catch(()=>toast('❌ Network error — could not reach GitHub','err'));
-  closeImportModal();
+
+  try{
+    // Step 1: get current file SHA
+    const getRes=await fetch(apiUrl,{
+      headers:{'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(!getRes.ok){
+      const err=await getRes.json().catch(()=>({}));
+      toast(`❌ GitHub error: ${err.message||getRes.status} — check your token`,'err');
+      return;
+    }
+    const fileData=await getRes.json();
+
+    // Step 2: overwrite with empty GeoJSON
+    const empty={type:'FeatureCollection',features:[]};
+    const body={
+      message:'Permanent reset — all imported data removed',
+      content:btoa(unescape(encodeURIComponent(JSON.stringify(empty)))),
+      sha:fileData.sha,
+      branch:c.branch||'main'
+    };
+    const putRes=await fetch(apiUrl,{
+      method:'PUT',
+      headers:{'Authorization':`token ${c.token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      body:JSON.stringify(body)
+    });
+    if(putRes.ok){
+      farmData=JSON.parse(JSON.stringify(BUILTIN_DATA));
+      saveToStorage();
+      updateDataSourceBadge(false);
+      fullRefresh();
+      refreshManageTab();
+      closeImportModal();
+      toast('✅ All imported data permanently deleted from GitHub','ok');
+    } else {
+      const err=await putRes.json().catch(()=>({}));
+      toast(`❌ GitHub delete failed: ${err.message||putRes.status}`,'err');
+    }
+  } catch(e){
+    toast('❌ Network error — could not reach GitHub','err');
+    console.error(e);
+  }
 }
 
 function exportGeoJSON(){
@@ -2090,24 +2305,37 @@ function renderFarmerView(parcels){
 
 function zoomFvParcel(idx){
   if(!fvMapInstance||!window._fvParcels)return;
-  // Re-render highlighting just that parcel
+  const farmerName=(window._fvParcels[0].properties.farmer_nam||'').trim().toUpperCase();
   fvMapLayer.clearLayers();
-  window._fvParcels.forEach((feat,i)=>{
-    const pp=feat.properties;
-    const col=parcelColor(pp.area_ha);
-    const layer=L.geoJSON(feat,{style:{fillColor:col,fillOpacity:i===idx?.9:.3,color:i===idx?'#f59e0b':'#ffffff',weight:i===idx?3:1.5,opacity:1}});
-    layer.bindPopup(`<div style="padding:10px;min-width:150px"><b>${pp.farmer_nam||'—'}</b><br>Area: ${parseFloat(pp.area_ha).toFixed(4)} ha<br>Location: ${pp.barangay_1||pp.barangay||'—'}</div>`);
+  farmData.features.forEach(f=>{
+    const p=f.properties;
+    const isFarmer=(p.farmer_nam||'').trim().toUpperCase()===farmerName;
+    const isSelected=window._fvParcels[idx]===f;
+    const style=isSelected
+      ?{fillColor:'#f59e0b',fillOpacity:.95,color:'#fff',weight:4,opacity:1}
+      :isFarmer
+        ?{fillColor:'#fbbf24',fillOpacity:.6,color:'#ffffff',weight:2.5,opacity:1}
+        :{fillColor:'#9ca3af',fillOpacity:.2,color:'#ffffff',weight:1,opacity:.4};
+    const layer=L.geoJSON(f,{style});
+    if(isFarmer){
+      const popup=`<div style="padding:10px 14px;font-family:sans-serif">
+        ${isSelected?'<div style="background:#f59e0b;color:#fff;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:800;margin-bottom:6px">👆 SELECTED PARCEL</div>':'<div style="background:#4ade80;color:#14532d;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:800;margin-bottom:6px">🌾 YOUR PARCEL</div>'}
+        <b>${p.farmer_nam||'—'}</b><br/>
+        <span style="font-size:11px;color:#555">${parseFloat(p.area_ha).toFixed(4)} ha · ${p.barangay_1||p.barangay||'—'}</span>
+      </div>`;
+      layer.bindPopup(popup,{maxWidth:220});
+    }
     fvMapLayer.addLayer(layer);
-    if(i===idx){
+    if(isSelected){
       setTimeout(()=>{
         try{fvMapInstance.fitBounds(layer.getBounds(),{padding:[60,60],maxZoom:18});}catch(e){}
         layer.openPopup();
-      },100);
+      },200);
     }
   });
 }
 
-function renderFvMap(parcels){
+function renderFvMap(farmerParcels){
   if(!fvMapInstance){
     fvMapInstance=L.map('fvMap',{zoomControl:true,attributionControl:false}).setView([17.65,121.88],14);
     fvBaseSatellite=L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{maxZoom:22});
@@ -2119,24 +2347,75 @@ function renderFvMap(parcels){
     fvMapLayer=L.featureGroup().addTo(fvMapInstance);
   }
   fvMapLayer.clearLayers();
-  parcels.forEach((f,i)=>{
+
+  // Build set of farmer's parcel_ids for quick lookup
+  const farmerIds=new Set(farmerParcels.map(f=>f.properties.parcel_id||f.properties.farmer_nam));
+  const farmerName=(farmerParcels[0].properties.farmer_nam||'').trim().toUpperCase();
+
+  // Draw ALL parcels from farmData
+  const highlightLayers=[];
+  farmData.features.forEach(f=>{
     const p=f.properties;
-    const col=parcelColor(p.area_ha);
-    const layer=L.geoJSON(f,{style:{fillColor:col,fillOpacity:.75,color:'#ffffff',weight:2,opacity:1}});
-    const popupHtml=`<div style="padding:12px 16px;min-width:180px;color:#fff;font-family:var(--font)">
-      <div style="font-weight:700;font-size:13px;margin-bottom:6px">${p.farmer_nam||'—'}</div>
-      <div style="font-size:12px;line-height:1.6">
-        Parcel ${i+1}${p.parcel_id?' · '+p.parcel_id:''}<br/>
-        Area: ${parseFloat(p.area_ha).toFixed(4)} ha<br/>
-        Location: ${p.barangay_1||p.barangay||'—'}
-      </div>
-    </div>`;
-    layer.bindPopup(popupHtml);
-    fvMapLayer.addLayer(layer);
+    const isFarmer=(p.farmer_nam||'').trim().toUpperCase()===farmerName;
+
+    if(isFarmer){
+      // Farmer's own parcels — bright amber highlight
+      const layer=L.geoJSON(f,{
+        style:{
+          fillColor:'#f59e0b',
+          fillOpacity:.85,
+          color:'#ffffff',
+          weight:3.5,
+          opacity:1
+        }
+      });
+      const idx=farmerParcels.indexOf(f);
+      const popup=`<div style="padding:12px 16px;min-width:190px;font-family:sans-serif">
+        <div style="background:#f59e0b;color:#fff;padding:4px 10px;border-radius:6px;font-weight:800;font-size:12px;margin-bottom:8px">🌾 YOUR PARCEL</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">${p.farmer_nam||'—'}</div>
+        <div style="font-size:11px;color:#555;line-height:1.7">
+          ${p.parcel_id?`Parcel ID: <b>${p.parcel_id}</b><br/>`:''}
+          Area: <b>${parseFloat(p.area_ha).toFixed(4)} ha</b><br/>
+          Location: ${p.barangay_1||p.barangay||'—'}
+        </div>
+      </div>`;
+      layer.bindPopup(popup,{maxWidth:240});
+      fvMapLayer.addLayer(layer);
+      highlightLayers.push(layer);
+    } else {
+      // Other farmers — dimmed grey
+      const layer=L.geoJSON(f,{
+        style:{
+          fillColor:'#9ca3af',
+          fillOpacity:.25,
+          color:'#ffffff',
+          weight:1,
+          opacity:.5
+        }
+      });
+      const popup=`<div style="padding:10px 14px;min-width:160px;font-family:sans-serif">
+        <div style="font-weight:700;font-size:12px;margin-bottom:4px">${p.farmer_nam||'—'}</div>
+        <div style="font-size:11px;color:#666;line-height:1.6">
+          Area: ${parseFloat(p.area_ha).toFixed(4)} ha<br/>
+          Location: ${p.barangay_1||p.barangay||'—'}
+        </div>
+      </div>`;
+      layer.bindPopup(popup,{maxWidth:200});
+      fvMapLayer.addLayer(layer);
+    }
   });
+
   setTimeout(()=>{
     fvMapInstance.invalidateSize();
-    try{fvMapInstance.fitBounds(fvMapLayer.getBounds(),{padding:[20,20],maxZoom:18});}catch(e){}
+    // Zoom to farmer's own parcels, not the whole map
+    if(highlightLayers.length){
+      const group=L.featureGroup(highlightLayers);
+      try{fvMapInstance.fitBounds(group.getBounds(),{padding:[80,80],maxZoom:18});}catch(e){}
+      // Open popup on first parcel
+      setTimeout(()=>highlightLayers[0].openPopup(),400);
+    } else {
+      try{fvMapInstance.fitBounds(fvMapLayer.getBounds(),{padding:[20,20],maxZoom:16});}catch(e){}
+    }
   },200);
 }
 
