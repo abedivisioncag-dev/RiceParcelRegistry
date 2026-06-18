@@ -883,8 +883,8 @@ html,body{height:100%;font-family:var(--font);background:var(--mist);color:var(-
             <input id="ghBranch" type="text" placeholder="main" style="width:100%;padding:9px 12px;border:1.5px solid var(--mist3);border-radius:9px;font-family:var(--font);font-size:13px;outline:none;box-sizing:border-box;background:var(--mist)" onfocus="this.style.borderColor='var(--g400)'" onblur="this.style.borderColor='var(--mist3)'"/>
           </div>
           <div>
-            <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.8px">Personal Access Token 🔐</label>
-            <input id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="width:100%;padding:9px 12px;border:1.5px solid var(--mist3);border-radius:9px;font-family:var(--mono,monospace);font-size:12px;outline:none;box-sizing:border-box;background:var(--mist)" onfocus="this.style.borderColor='var(--g400)'" onblur="this.style.borderColor='var(--mist3)'"/>
+            <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.8px">Personal Access  🔐</label>
+            <input id="gh" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="width:100%;padding:9px 12px;border:1.5px solid var(--mist3);border-radius:9px;font-family:var(--mono,monospace);font-size:12px;outline:none;box-sizing:border-box;background:var(--mist)" onfocus="this.style.borderColor='var(--g400)'" onblur="this.style.borderColor='var(--mist3)'"/>
             <div style="font-size:10px;color:var(--muted2);margin-top:4px">Stored only on this browser. Never shared or embedded in the file.</div>
           </div>
           <div style="display:flex;gap:8px">
@@ -953,7 +953,7 @@ const GH_DEFAULT = {
   owner:  'abedivisioncag-dev',
   repo:   'RiceParcelRegistry',
   branch: 'main',
-  token:  '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'
+  token:  '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'
 };
 
 function ghConfig(){
@@ -2099,7 +2099,7 @@ async function permanentDeleteFromGitHub(){
     };
     const putRes=await fetch(apiUrl,{
       method:'PUT',
-      headers:{'Authorization':`token ${c.token}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+      headers:{'Authorization':` ${c.}`,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
       body:JSON.stringify(body)
     });
     if(putRes.ok){
