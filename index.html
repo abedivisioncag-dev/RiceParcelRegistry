@@ -997,9 +997,10 @@ async function loadFromGitHub(){
     if(!res.ok){ loadFromStorage(); return; }
     const geojson=await res.json();
     if(geojson&&geojson.features&&geojson.features.length){
-      const imported=geojson.features.map(f=>({...f,properties:{...f.properties,_source:'imported'}}));
-      const builtins=farmData.features.filter(f=>f.properties._source!=='imported');
-      farmData.features=[...builtins,...imported];
+      // The shared GitHub file now stores the FULL dataset (built-in parcels
+      // with any edits, plus any imported parcels), so it's safe to use it
+      // directly as the source of truth for every user.
+      farmData.features=geojson.features;
       updateDataSourceBadge(true);
     } else {
       loadFromStorage();
@@ -1013,8 +1014,10 @@ async function loadFromGitHub(){
 async function saveToGitHub(){
   if(!ghIsConfigured()){ saveToStorage(); toast('⚠️ GitHub not configured — saved locally only','err'); return false; }
   const c=ghConfig();
-  const imported=farmData.features.filter(f=>f.properties._source==='imported');
-  const geojson={type:'FeatureCollection',features:imported};
+  // Save ALL parcels (built-in + imported) so that edits to any parcel's
+  // attributes are pushed to the shared repo and visible to every user,
+  // not just locally in this browser's storage.
+  const geojson={type:'FeatureCollection',features:farmData.features};
   const content=btoa(unescape(encodeURIComponent(JSON.stringify(geojson,null,2))));
   const apiUrl=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${GH_DATA_FILE}`;
   try{
@@ -1297,7 +1300,7 @@ function cancelEditMode(){
   if(btn)btn.style.display='';
 }
 
-function saveEditRecord(){
+async function saveEditRecord(){
   const p=farmData.features[activeFeatureIdx].properties;
   document.querySelectorAll('#dp-edit-fields input').forEach(inp=>{
     const key=inp.dataset.key;
@@ -1306,10 +1309,13 @@ function saveEditRecord(){
   });
   // sync barangay alias
   if(p.barangay_1)p.barangay=p.barangay_1;
-  saveToStorage();
+  const saveBtn=document.querySelector('#dp-edit-form button[onclick="saveEditRecord()"]');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving…';}
+  const ok=await saveToGitHub(); // pushes to the shared repo, not just this browser
+  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save';}
   openDetail(activeFeatureIdx);
   fullRefresh();
-  toast('Record updated ✓','ok');
+  toast(ok?'Record updated & synced for everyone ✓':'Record updated (saved locally only — check GitHub connection)',ok?'ok':'err');
 }
 
 // ─── SEARCH ───
