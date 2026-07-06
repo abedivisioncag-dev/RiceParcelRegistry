@@ -2647,7 +2647,7 @@ function updateTimestamp(){
   const min=now.getMinutes().toString().padStart(2,'0');
   const el=document.getElementById('liveTimestamp');
   if(el)el.textContent=`${d}, ${m} ${date}, ${yr}  ${h}:${min}`;
-}}
+}
 updateTimestamp();
 setInterval(updateTimestamp,60000);
 </script>
