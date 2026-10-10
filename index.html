@@ -1208,7 +1208,13 @@ async function saveImportedToGitHub(){
   const c=ghConfig();
   const imported=farmData.features.filter(f=>f.properties._source==='imported');
   const geojson={type:'FeatureCollection',features:imported,customFields:customFieldDefs};
-  const content=btoa(unescape(encodeURIComponent(JSON.stringify(geojson,null,2))));
+  const _json=JSON.stringify(geojson);   // compact (no indentation) to keep the file as small as possible
+  if(_json.length>20e6){
+    saveToStorage();
+    toast('⚠ Imported data is '+(_json.length/1e6).toFixed(0)+' MB, too large to save to GitHub from the browser. Add the file to the repository itself (as solana_parcels.geojson) instead of importing it.','err');
+    return false;
+  }
+  const content=btoa(unescape(encodeURIComponent(_json)));
   const apiUrl=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${GH_DATA_FILE}`;
   try{
     let sha='';
@@ -2851,6 +2857,7 @@ async function doAdminLogin(){
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');
     toast('Welcome, Admin 🛡','ok');
     startApprPolling();
+    if(typeof hzLoadFromGitHub==='function')hzLoadFromGitHub();
   } else {
     err.style.display='block';
     document.getElementById('adminPass').value='';
@@ -3341,8 +3348,81 @@ function stopApprPolling(){if(_apprTimer){clearInterval(_apprTimer);_apprTimer=n
 // ================= HAZARD LAYERS =================
 const HAZ_PALETTE=['#2563eb','#9333ea','#0d9488','#db2777','#65a30d','#ea580c','#0891b2','#7c3aed'];
 let hazLayers=[]; // {id,name,field,fc,layer,on,cats:{value:color}}
+// ---- hazard layers saved in the repository: hazards/<id>.geojson + hazards/index.json ----
+const HZ_DIR='hazards',HZ_MANIFEST='hazards/index.json';
+async function ghRaw(path){
+  const c=ghConfig();if(!c.owner||!c.repo)return undefined;
+  const url=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${path}?ref=${c.branch||'main'}&t=${Date.now()}`;
+  const h={'Accept':'application/vnd.github.raw'};if(c.token)h.Authorization=`token ${c.token}`;
+  let r=await fetch(url,{headers:h,cache:'no-store'});
+  if((r.status===401||r.status===403)&&h.Authorization){delete h.Authorization;r=await fetch(url,{headers:h,cache:'no-store'});}
+  if(r.status===404)return null;
+  return r.ok?await r.json():undefined;
+}
+async function ghPutJson(path,obj,message){
+  if(!ghIsConfigured())return false;
+  const json=JSON.stringify(obj);
+  if(json.length>15e6){toast('⚠ '+path+' is '+(json.length/1e6).toFixed(0)+' MB, too large to save from the browser. Add it to the repository manually.','err');return false;}
+  const c=ghConfig(),api=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${path}`,hd={'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'};
+  try{
+    let sha='';const g=await fetch(api+`?ref=${c.branch||'main'}&t=${Date.now()}`,{headers:hd,cache:'no-store'});
+    if(g.ok)sha=(await g.json()).sha||'';
+    const body={message,content:btoa(unescape(encodeURIComponent(json))),branch:c.branch||'main'};if(sha)body.sha=sha;
+    const r=await fetch(api,{method:'PUT',headers:{...hd,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(r.ok)return true;
+    const err=await r.json();toast('❌ GitHub save failed: '+(err.message||'error'),'err');
+  }catch(e){toast('❌ GitHub connection failed','err');}
+  return false;
+}
+async function ghDeleteFile(path,message){
+  if(!ghIsConfigured())return false;
+  const c=ghConfig(),api=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${path}`,hd={'Authorization':`token ${c.token}`,'Accept':'application/vnd.github.v3+json'};
+  try{
+    const g=await fetch(api+`?ref=${c.branch||'main'}&t=${Date.now()}`,{headers:hd,cache:'no-store'});if(!g.ok)return true;
+    const sha=(await g.json()).sha;
+    const r=await fetch(api,{method:'DELETE',headers:{...hd,'Content-Type':'application/json'},body:JSON.stringify({message,sha,branch:c.branch||'main'})});
+    return r.ok;
+  }catch(e){return false;}
+}
+async function hzSyncManifest(mutator){
+  let m=await ghRaw(HZ_MANIFEST);if(!m||!Array.isArray(m.layers))m={layers:[]};
+  mutator(m);return ghPutJson(HZ_MANIFEST,m,'Update hazard layers');
+}
+async function hzPublish(o){
+  if(!ghIsConfigured()){toast('GitHub is not configured. The hazard layer is saved in this browser only.','err');return false;}
+  const prog=document.getElementById('hzProg_'+o.id);if(prog)prog.textContent='Saving to GitHub…';
+  const ok=await ghPutJson(`${HZ_DIR}/${o.id}.geojson`,o.fc,'Add hazard layer '+o.name);
+  if(!ok){renderHazPanel();return false;}
+  const ok2=await hzSyncManifest(m=>{m.layers=m.layers.filter(x=>x.id!==o.id);m.layers.push({id:o.id,name:o.name,field:o.field,op:o.op,file:`${HZ_DIR}/${o.id}.geojson`});});
+  if(ok2){o.remote=true;hzPut(o);toast('Hazard layer saved to the repository ✓','ok');}
+  renderHazPanel();return ok2;
+}
+async function hzUnpublish(o){
+  if(!o||!o.remote||!ghIsConfigured())return;
+  await hzSyncManifest(m=>{m.layers=m.layers.filter(x=>x.id!==o.id);});
+  await ghDeleteFile(`${HZ_DIR}/${o.id}.geojson`,'Remove hazard layer '+o.name);
+}
+let _hzT=null;
+function hzQueueManifest(o){if(!o||!o.remote)return;clearTimeout(_hzT);_hzT=setTimeout(()=>hzSyncManifest(m=>{const e=m.layers.find(x=>x.id===o.id);if(e){e.field=o.field;e.op=o.op;}}),1500);}
+async function hzLoadFromGitHub(){
+  try{
+    const m=await ghRaw(HZ_MANIFEST);
+    if(m===undefined)return;                                   // could not reach GitHub: keep what is local
+    const list=(m&&Array.isArray(m.layers))?m.layers:[];
+    for(const e of list){
+      const have=hazLayers.find(x=>x.id===e.id);
+      if(have){have.remote=true;continue;}
+      const fc=await ghRaw(e.file);if(!fc||!fc.features)continue;
+      const o={id:e.id,name:e.name,field:e.field,op:e.op,fc,remote:true};
+      hzBuild(o);hazLayers.push(o);hzPut(o);
+    }
+    hazLayers.filter(o=>o.remote&&!list.find(e=>e.id===o.id)).forEach(o=>{map.removeLayer(o.layer);hazLayers.splice(hazLayers.indexOf(o),1);hzRemove(o.id);});
+    renderHazPanel();
+  }catch(e){console.warn('Hazard load failed',e);}
+}
+
 function hzIDB(){return new Promise((res,rej)=>{const r=indexedDB.open('ricemap_haz',1);r.onupgradeneeded=()=>r.result.createObjectStore('h',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
-async function hzPut(o){try{(await hzIDB()).transaction('h','readwrite').objectStore('h').put({id:o.id,name:o.name,field:o.field,fc:o.fc,assign:o.assign,attr:o.attr,n:o.n,op:o.op});}catch(e){}}
+async function hzPut(o){try{(await hzIDB()).transaction('h','readwrite').objectStore('h').put({id:o.id,name:o.name,field:o.field,fc:o.fc,assign:o.assign,attr:o.attr,n:o.n,op:o.op,remote:o.remote});}catch(e){}}
 async function hzRemove(id){try{(await hzIDB()).transaction('h','readwrite').objectStore('h').delete(id);}catch(e){}}
 async function hzAll(){try{const d=await hzIDB();return await new Promise(r=>{const q=d.transaction('h').objectStore('h').getAll();q.onsuccess=()=>r(q.result||[]);q.onerror=()=>r([]);});}catch(e){return[];}}
 function hzColor(v,cats){
@@ -3377,8 +3457,9 @@ async function addHazardFiles(files){
       const list=Array.isArray(fc)?fc:[fc];
       for(const g of list){
         if(!g||!g.features||!g.features.length)continue;
+        try{turf.simplify(g,{tolerance:0.00002,highQuality:false,mutate:true});turf.truncate(g,{precision:6,coordinates:2,mutate:true});}catch(e){} // ~2 m; keeps the file small enough for the repository
         const o={id:'h'+Date.now()+Math.random().toString(36).slice(2,6),name:(g.fileName||file.name).replace(/\.(zip|geojson|json)$/i,''),fc:g};
-        o.field=hzPickField(g);hzBuild(o);hazLayers.push(o);await hzPut(o);
+        o.field=hzPickField(g);hzBuild(o);hazLayers.push(o);await hzPut(o);renderHazPanel();await hzPublish(o);
       }
     }catch(e){toast('Could not read '+file.name+': '+e.message,'err');}
   }
@@ -3388,9 +3469,9 @@ async function addHazardFiles(files){
 }
 function hzToggle(id,on){const o=hazLayers.find(x=>x.id===id);if(!o)return;o.on=on;on?o.layer.addTo(map):map.removeLayer(o.layer);}
 function hzClearAttr(o){if(!o.attr)return;window.hzAttrs=(window.hzAttrs||[]).filter(a=>a.key!==o.attr.key);farmData.features.forEach(f=>{delete f.properties[o.attr.key];delete f.properties[o.attr.key+'_pct'];});o.assign=null;o.attr=null;}
-function hzSetField(id,f){const o=hazLayers.find(x=>x.id===id);if(!o)return;hzClearAttr(o);saveToGitHub();o.field=f;const was=o.on;map.removeLayer(o.layer);hzBuild(o);if(!was){map.removeLayer(o.layer);o.on=false;}hzPut(o);renderHazPanel();}
-function hzDelete(id){const i=hazLayers.findIndex(x=>x.id===id);if(i<0||!confirm('Remove this hazard layer (and the parcel attribute made from it)?'))return;hzClearAttr(hazLayers[i]);saveToGitHub();map.removeLayer(hazLayers[i].layer);hazLayers.splice(i,1);hzRemove(id);renderHazPanel();}
-function hzOpacity(id,v){const o=hazLayers.find(x=>x.id===id);if(!o)return;o.op=parseFloat(v);o.layer.setStyle({fillOpacity:o.op});hzPut(o);}
+function hzSetField(id,f){const o=hazLayers.find(x=>x.id===id);if(!o)return;hzClearAttr(o);saveToGitHub();o.field=f;const was=o.on;map.removeLayer(o.layer);hzBuild(o);if(!was){map.removeLayer(o.layer);o.on=false;}hzPut(o);hzQueueManifest(o);renderHazPanel();}
+function hzDelete(id){const i=hazLayers.findIndex(x=>x.id===id);if(i<0||!confirm('Remove this hazard layer (and the parcel attribute made from it)? It will also be removed from the repository.'))return;hzClearAttr(hazLayers[i]);saveToGitHub();map.removeLayer(hazLayers[i].layer);const removed=hazLayers.splice(i,1)[0];hzRemove(id);hzUnpublish(removed);renderHazPanel();}
+function hzOpacity(id,v){const o=hazLayers.find(x=>x.id===id);if(!o)return;o.op=parseFloat(v);o.layer.setStyle({fillOpacity:o.op});hzPut(o);hzQueueManifest(o);}
 let hzRestored=false;
 function hzApplyAssignments(){
   return; // parcel values now come from the saved edits file (parcel_edits.json)
@@ -3437,6 +3518,7 @@ async function hzAssign(id){
 function renderHazPanel(){
   const admin=(typeof currentRole!=='undefined')&&currentRole==='admin';
   document.getElementById('hazAdd').style.display=admin?'block':'none';
+  hazLayers.forEach(o=>{if(!o.attr){const a=(window.hzAttrs||[]).find(x=>x.layer===o.name);if(a)o.attr={key:a.key,label:a.label};}});
   document.getElementById('hazList').innerHTML=hazLayers.length?hazLayers.map(o=>{
     const cols=Object.keys((o.fc.features[0]||{}).properties||{});
     const seen=[...new Set(o.fc.features.map(f=>f.properties[o.field]))].slice(0,8);
@@ -3447,6 +3529,8 @@ function renderHazPanel(){
       <input type="range" min="0.1" max="0.9" step="0.05" value="${o.op}" oninput="hzOpacity('${o.id}',this.value)" style="width:100%" title="Overlay opacity">
       ${seen.map(v=>`<div style="display:flex;gap:6px;align-items:center;font-size:11px;margin-top:3px"><span style="width:14px;height:14px;border-radius:3px;background:${hzColor(v,o.cats)};opacity:.7"></span>${v}</div>`).join('')}
       ${admin?`<button class="crop-pill" style="width:100%;margin-top:8px" onclick="hzAssign('${o.id}')">🔗 ${o.attr?'Re-assign':'Assign'} to parcels (largest area)</button>`:''}
+      <div style="font-size:11px;margin-top:6px;color:${o.remote?'#15803d':'#b45309'}">${o.remote?'☁ Saved in the repository':'⚠ Saved in this browser only'}</div>
+      ${admin&&!o.remote?`<button class="crop-pill" style="width:100%;margin-top:4px" onclick="hzPublish(hazLayers.find(x=>x.id==='${o.id}'))">☁ Save to GitHub</button>`:''}
       <div id="hzProg_${o.id}" style="font-size:11px;color:#15803d;margin-top:4px">${o.attr?'Parcel attribute: '+o.attr.label:''}</div>
     </div>`;}).join(''):'<div style="color:#666">No hazard layers loaded.</div>';
 }
