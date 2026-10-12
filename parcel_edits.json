@@ -1,1 +1,1 @@
-{"version":1,"updated":"2026-10-11T03:24:21.683Z","edits":{"SOL-000089":{"s":{"barangay_1":"Unassigned"}}},"deleted":[],"hazardAttrs":[],"customFields":[]}
+{"version":1,"updated":"2026-10-12T04:51:41.860Z","edits":{"SOL-000089":{"s":{"barangay_1":"Unassigned"}}},"deleted":[],"hazardAttrs":[],"customFields":[{"key":"cf_date_of_planting","label":"Date of planting","type":"date","farmerEditable":true,"required":false,"help":"The date you planted or transplanted.","dateRule":"any"}]}
