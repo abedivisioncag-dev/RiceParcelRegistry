@@ -1,1 +1,1 @@
-{"type":"FeatureCollection","features":[],"customFields":[{"key":"cf_date_of_planting","label":"Date of planting","type":"date","farmerEditable":true,"required":false,"help":"The date you planted or transplanted.","dateRule":"any"}]}
+{"type":"FeatureCollection","features":[],"customFields":[]}
